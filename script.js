@@ -2985,6 +2985,7 @@ async function backendData(functionName = "getAccount", input) {
         throw new Error(`Fetch failed: ${res.status}`);
     }
     const newManager = await res.json();
+    console.log(newManager);
     return newManager.body;
 }
 function getDBData(dataId, handler = () => { }) {
