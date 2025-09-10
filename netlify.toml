@@ -1,0 +1,8 @@
+[functions]
+  directory = "netlify/functions"
+
+
+netlify/functions/
+  getAccount.js   → /.netlify/functions/getAccount
+  newAccount.js   → /.netlify/functions/newAccount
+  saveAccount.js   → /.netlify/functions/saveAccount

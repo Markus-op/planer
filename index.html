@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2262b0ff">
+    <link rel="icon" href="/icon.png" type="image/png" />
+    <title>Planer 2.0</title>
+    <script src="/script.js" defer></script>
+</head>
+
+<body id="body">
+    <div id="mainInfoPlace" class="colored fixed" style="width: calc(100% - 20px);"></div>
+    <main id="main"></main>
+    <div id="main_place"></div>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/sw.js").then(() => {
+                console.log("Service Worker registriert");
+            });
+
+            navigator.serviceWorker.addEventListener("message", (event) => {
+                if (event.data.type === "UPDATE_READY") {
+                    alert("Neue Version verfügbar - Seite wird neu geladen!");
+                    window.location.reload();
+                }
+            });
+        }
+
+    </script>
+</body>
+
+</html>

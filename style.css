@@ -1,0 +1,232 @@
+        :root {
+            --main-color: rgb(60, 200, 60)
+        }
+
+        body {
+            margin: 0px;
+            font-family: Arial, sans-serif;
+            background-color: var(--main-color);
+            padding: 10px;
+            user-select: none;
+        }
+
+        #main_place {
+            height: 50px;
+        }
+
+        button {
+            margin: 15px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            border-width: 0px;
+            cursor: pointer;
+            animation: fadeIn 1s;
+        }
+
+        h2 {
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            animation: fadeIn 1s;
+        }
+
+        h3 {
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            animation: fadeIn 1s;
+        }
+
+        p {
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            animation: fadeIn 1s;
+        }
+
+        textarea {
+            margin: 10px;
+            width: 70%;
+            border-radius: 15px;
+            border-width: 0px;
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.7);
+            resize: none;
+            font-family: Arial, sans-serif;
+            animation: fadeIn 1s;
+        }
+
+        input {
+            margin: 10px;
+            width: 50%;
+            border-radius: 15px;
+            border-width: 0px;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            resize: none;
+            font-family: Arial, sans-serif;
+            animation: fadeIn 1s;
+        }
+
+        div {
+            animation: fadeIn 1s;
+        }
+
+        .line {
+            width: 100%;
+            border-radius: 50%;
+            border-style: solid;
+            border-width: 10px;
+            border-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .fixed {
+            position: fixed;
+        }
+
+        .absolute {
+            position: absolute;
+        }
+
+        .center {
+            display: flex;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .middle {
+            display: flex;
+            align-items: center;
+        }
+
+        .ordered {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .circle {
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.5);
+            animation: fadeIn 1s;
+            font-weight: bold;
+            font-size: large;
+        }
+
+        .left {
+            display: flex;
+            justify-content: left;
+            text-align: left;
+        }
+
+        .vert {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .inlineMargin {
+            margin-inline: 5px;
+        }
+
+        .blockMargin {
+            margin-block: 5px;
+        }
+
+        .bordered {
+            border-style: solid;
+            border-color: rgba(0, 0, 0, 0.5);
+            border-width: 3px;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .small {
+            width: 40px;
+        }
+
+        .task {
+            margin-block: 10px;
+            transition: height 0.4s ease-out;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            border-style: solid;
+            border-width: 5px;
+            border-color: rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .event {
+            margin-block: 10px;
+            height: auto;
+            transition: height 0.4s ease-out;
+            background-color: rgba(255, 255, 255, 0.4);
+            border-radius: 20px;
+            box-shadow: 0px 0px 20px 5px rgba(255, 255, 255, 0.4);
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .shinyTask {
+            margin-block: 10px;
+            transition: height 0.4s ease-out;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            border-style: solid;
+            border-width: 3px;
+            border-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .object {
+            margin-block: 10px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            border-style: solid;
+            border-width: 4px;
+            border-color: rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        .darkBox {
+            margin-bottom: 10px;
+            padding-inline: 5px;
+            border-radius: 15px;
+            width: 70%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: rgba(255, 255, 255, 0.5);
+            padding: 3px;
+        }
+
+        .green {
+            background-color: rgba(0, 128, 0, 0.9);
+        }
+
+        .red {
+            background-color: rgb(255, 0, 0, 0.9);
+        }
+
+        .unanimate {
+            animation: none;
+        }
+
+        .colored {
+            background-color: var(--main-color);
+            border-color: var(--main-color);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
