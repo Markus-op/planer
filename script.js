@@ -2984,14 +2984,19 @@ async function backendData(functionName = "getAccount", input) {
         console.error("Fehler von Function:", text);
         throw new Error(`Fetch failed: ${res.status}`);
     }
-    const newManager = await res.json();
-    return JSON.parse(newManager);
+    const output = await res.json();
+    console.log(output);
+    try {
+        return JSON.parse(output); //manager
+    } catch {
+        return output; //data id
+    }
 }
 function getDBData(dataId, handler = () => { }) {
     backendData("getAccount", dataId)
         .then((manager) => {
             if (manager == "No Account") manager = "null";
-            handler(JSON.parse(manager))
+            handler(manager)
         });
 }
 function addDBData(manager, handler) {
