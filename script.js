@@ -32,7 +32,7 @@ function start() {
     const isNewDay = dailyUpdate();
     if (isNewDay) {
         addObjectReminder(); //reminder daily from objects
-        if (getDate().weekday = 2) downloadManager(); //every friday
+        if (getDate().weekday == 5) downloadManager(); //every friday
         preStart();
         return;
     }; //prestart if new day
@@ -225,10 +225,18 @@ function checkForShowSleepTime() {
     return true;
 }
 function getNightTimes(time = getTime(), asStrings = false) {
-    const buffer = getTimeBuffer();
+    let setTime = getTime() + 10 * 60 * 60;
+    let setDate = getDate();
+    if (setTime > 24 * 60 * 60) {
+        setTime -= 24 * 60 * 60;
+        setDate = nextDate(setDate);
+    }
+    const tasks = sortTasks(getTasks()); //without changes in orig
+    const buffer = Math.max(getTimeBuffer(tasks, false, setTime, setDate), 0);
     const dayTime = 24 * 60 * 60;
     time += buffer; //get latest time to start tomorow
-    time = Math.min(time, dayTime * 34 / 24);
+    time = Math.min(time, dayTime * 34 / 24); //latest is 10:00
+    time = Math.ceil(time / 60 / 60 * 4) * 60 * 60 / 4; //round to next 1/4 h
     const startTime = asStrings ? miniStr(time) : time; //(more than 24h is ok)
     time -= 60 * 60; //prepare time in morning
     const wakeUpTime = asStrings ? miniStr(time) : time;
@@ -279,7 +287,7 @@ function submitNewIntent() {
     else { //no problem
         let intents = getIntents();
         intents.push(intent);
-        saveIntents(intents);
+        saveIntents(intents, true);
         start();
     }
 }
@@ -301,7 +309,7 @@ function submitIntentChange(index) {
     intent.skipOnce = Boolean(rand());
     intent.notSecured = !value; //ask sec time for secIntent
     intents = mixArray(intents);
-    saveIntents(intents);
+    saveIntents(intents, true);
     pageIntentInfo(intent, !secIntent);
 }
 function intentFeedback(intent) {
@@ -383,7 +391,7 @@ function submitChangeTask(id) {
     if (feedback) alertInfo(feedback);
     else {
         tasks[index] = task;
-        saveTasks(tasks);
+        saveTasks(tasks, true);
         pageViewTask(id);
     }
 }
@@ -565,7 +573,7 @@ function submitNewTask(id) {
             tasks.push(newTask); //real task
             connectTasks(id, newTask.id, true, false, tasks);
         }
-        saveTasks(tasks);
+        saveTasks(tasks, true);
         if (prepareTask) pageEditTask(prepareTask.id);
         else pageViewTask(newTask.id);
     }
@@ -599,7 +607,7 @@ function connectTasks(aimId, addId, grouping, newGroup, tasks) {
         addTask.taskList = addTask.taskList.concat(aimTask.taskList);
     resortTaskLinks(tasks, true); //connect from other sites
     if (goToTask) {
-        saveTasks(tasks);
+        saveTasks(tasks, true);
         pageViewTask(aimId);
     } else return tasks;
 }
@@ -839,7 +847,7 @@ function dayTasksInTasks(dayTasks) {
     }
     return tasks;
 }
-function getTimeBuffer(tasks = getTasks(), returnArrays = false, curTime = getTime()) {
+function getTimeBuffer(tasks = getTasks(), returnArrays = false, curTime = getTime(), curDate = getDate()) {
     let lowestBuffer = Infinity; //average or lowest
     let taskBuffers = [];
     let eventBuffers = [];
@@ -847,17 +855,16 @@ function getTimeBuffer(tasks = getTasks(), returnArrays = false, curTime = getTi
         if (isEvent(task) && taskBuffer < 0) eventBuffers.push(taskBuffer);
         taskBuffers.push(taskBuffer); //update values
         lowestBuffer = Math.min(lowestBuffer, taskBuffer + gapTime);
-    }, curTime);
+    }, curTime, curDate);
     eventBuffers = sortNumbers(eventBuffers).reverse();
     taskBuffers = sortNumbers(taskBuffers).reverse();
     let allBuffers = { events: eventBuffers, tasks: taskBuffers };
     if (returnArrays) return allBuffers;
     return lowestBuffer;
 }
-function walkTaskTimes(tasks = getTasks(), handler = () => { }, time = getTime()) {
+function walkTaskTimes(tasks = getTasks(), handler = () => { }, time = getTime(), date = getDate()) {
     const currentEvents = curEvents(tasks);
     let gapTime = 0; //lowest buffer makes sense
-    let date = getDate();
     for (let index = 0; index < tasks.length; index++) {
         const task = tasks[index];
         let taskBuffer = Infinity;
@@ -968,7 +975,7 @@ function separateTask(id) {
     if (!task) return;
     task.taskList = []; //cut from this task
     resortTaskLinks(tasks, false); //cut from other tasks
-    saveTasks(tasks);
+    saveTasks(tasks, true);
     pageViewTask(id);
 }
 function copyTask(id, tasks = getTasks()) {
@@ -978,7 +985,7 @@ function copyTask(id, tasks = getTasks()) {
     task.taskList.push(oldTask.id); //connect with each other
     oldTask.taskList.push(task.id);
     tasks.push(task);
-    saveTasks(tasks);
+    saveTasks(tasks, true);
 }
 function removeTask(id, tasks, taskStart) {
     tasks = tasks || getTasks();
@@ -994,7 +1001,7 @@ function deleteTask(id, tasks) {
     if (index == null) return tasks;
     tasks.splice(index, 1); //del
     resortTaskLinks(tasks, false); //cut recent connections
-    saveTasks(tasks);
+    saveTasks(tasks, true);
     return tasks;
 }
 function checkForReminder() {
@@ -1126,7 +1133,7 @@ function submitNewObject(id) {
     let links = object.links[type] || []; //linked objects
     links.push(linkId); //link new
     object.links[type] = links;
-    saveObjects(objects);
+    saveObjects(objects); //save in acc in updateBirth
     removeDoubleLinks();
     updateBirthsAges();
     pageViewObject(id);
@@ -1200,7 +1207,7 @@ function removeDoubleLinks(objects) {
                 revLinks.splice(index, 1);
         }
     }
-    saveObjects(objects);
+    saveObjects(objects); //save in acc at updateBirthAges
 }
 function removeEmptyLinks(objects) {
     objects = objects || getObjects();
@@ -1226,7 +1233,7 @@ function removeEmptyLinks(objects) {
             if (revIndex == null) revLinks.splice(index, 1); //link to nowhere
         }
     }
-    saveObjects(objects);
+    saveObjects(objects, true);
     return objects;
 }
 function removeObject(id) {
@@ -1335,7 +1342,7 @@ function submitRenameObject(id) {
         return alertInfo("Dieses Objekt gibt es leider schon.");
     object.dataType = dataType;
     object.value = value;
-    saveObjects(objects);
+    saveObjects(objects, true);
     updateBirthsAges();
     pageViewObject(id);
 }
@@ -1356,7 +1363,7 @@ function renameLinkType(id, oldLinkType, newLinkType) {
     const object = indexById(id, objects, true);
     object.links[newLinkType] = cl(object.links[oldLinkType]); //copy content
     object.links[oldLinkType] = undefined; //remove old
-    saveObjects(objects);
+    saveObjects(objects, true);
 }
 function deleteLinkType(linkType, id) {
     const objects = getObjects();
@@ -1440,7 +1447,7 @@ function updateBirthsAges() {
             object.links[newLinkType] = [newObject.id]; //reset data
         }
     }
-    saveObjects(objects);
+    saveObjects(objects, true);
 }
 function addBirthdayTasks(objects = getObjects(), tasks = getTasks()) {
     for (let index = 0; index < objects.length; index++) {
@@ -1487,7 +1494,7 @@ function addBirthdayTasks(objects = getObjects(), tasks = getTasks()) {
             }
         }
     }
-    saveTasks(tasks);
+    saveTasks(tasks, true);
 }
 function addObjectReminder(objects = getObjects(), tasks = getTasks()) {
     for (let index = 0; index < objects.length; index++) {
@@ -1519,7 +1526,7 @@ function addObjectReminder(objects = getObjects(), tasks = getTasks()) {
             }
         }
     }
-    saveTasks(tasks);
+    saveTasks(tasks, true);
 }
 function pageAskAccount() {
     const manager = getManager();
@@ -2936,42 +2943,43 @@ function getTasks() {
     const manager = get("manager") || {};
     return manager.tasks || [];
 }
-function saveTasks(tasks) {
-    if (!tasks) return;
-    let manager = get("manager") || {};
+function saveTasks(tasks, changeAcc) {
+    if (typeof tasks != "object") return;
+    let manager = getManager();
     manager.tasks = tasks;
-    save("manager", manager);
+    saveManager(manager, changeAcc);
 }
 function getIntents() {
     let manager = getManager();
     return manager.intents || [];
 }
-function saveIntents(intents) {
-    if (!intents) console.error("no data");
-    else {
-        let manager = getManager();
-        manager.intents = intents;
-        saveManager(manager);
-    }
+function saveIntents(intents, changeAcc) {
+    if (typeof intents != "object") return console.error("no data");
+    let manager = getManager();
+    manager.intents = intents;
+    saveManager(manager, changeAcc);
 }
 function getObjects() {
     let manager = getManager();
     return manager.objects || [];
 }
-function saveObjects(objects) {
+function saveObjects(objects, changeAcc) {
     if (!objects) console.error("no data");
     else {
         let manager = getManager();
         manager.objects = objects;
-        saveManager(manager);
+        saveManager(manager, changeAcc);
     }
 }
 function getManager() {
     return get("manager") || {};
 }
-function saveManager(manager) {
-    if (manager) save("manager", manager);
-    else console.error("no manager");
+function saveManager(manager, changeAcc = false) {
+    if (typeof manager == "object") {
+        save("manager", manager);
+        if (manager.dataId && changeAcc)
+            changeDBData(manager); //try to change
+    } else console.error("no manager");
 }
 async function backendData(functionName = "getAccount", input) {
     const res = await fetch("/.netlify/functions/" + functionName, {
@@ -2985,7 +2993,6 @@ async function backendData(functionName = "getAccount", input) {
         throw new Error(`Fetch failed: ${res.status}`);
     }
     const output = await res.json();
-    console.log(output);
     try {
         return JSON.parse(output); //manager
     } catch {
@@ -2995,7 +3002,7 @@ async function backendData(functionName = "getAccount", input) {
 function getDBData(dataId, handler = () => { }) {
     backendData("getAccount", dataId)
         .then((manager) => {
-            if (manager == "No Account") manager = "null";
+            if (manager == "No Account") manager = null;
             handler(manager)
         });
 }
