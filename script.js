@@ -224,17 +224,30 @@ function checkForShowSleepTime() {
     if (getManager().showedSleepTimes) return false; //showed already
     return true;
 }
-function getNightTimes(time = getTime(), asStrings = false) {
-    let setTime = getTime() + 10 * 60 * 60;
+function latestStartTime() { //returns buffer
+    let tasks = getTasks();
+    let stepTime = 10 * 60 * 60;
+    let setTime = getTime() + stepTime;
     let setDate = getDate();
-    if (setTime > 24 * 60 * 60) {
-        setTime -= 24 * 60 * 60;
-        setDate = nextDate(setDate);
+    for (let amount = 10; amount > 0; amount--) {
+        if (setTime > 24 * 60 * 60) { //tomorrow
+            setTime -= 24 * 60 * 60;
+            setDate = nextDate(setDate);
+        } else if (setTime < 0) { //yesterday
+            setTime = 24 * 60 * 60 - setTime;
+            setDate = lastDate(setDate);
+        }
+        tasks = sortTasks(tasks, setTime, setDate); //without changes in orig
+        if (getTimeBuffer(tasks, false, setTime, setDate) < 0) { //planed too late
+            setTime -= stepTime;
+        } else setTime += stepTime;
+        stepTime /= 2; //half for next time
     }
-    const tasks = sortTasks(getTasks()); //without changes in orig
-    const buffer = Math.max(getTimeBuffer(tasks, false, setTime, setDate), 0);
+    return timeDif(getDate(), getTime(), setDate, setTime); //
+}
+function getNightTimes(time = getTime(), asStrings = false) {
     const dayTime = 24 * 60 * 60;
-    time += buffer; //get latest time to start tomorow
+    time += latestStartTime(); //get latest time to start tomorow
     time = Math.min(time, dayTime * 34 / 24); //latest is 10:00
     time = Math.ceil(time / 60 / 60 * 4) * 60 * 60 / 4; //round to next 1/4 h
     const startTime = asStrings ? miniStr(time) : time; //(more than 24h is ok)
@@ -758,7 +771,7 @@ function sortTasksByEnd(tasks) {
     }
     return tasks;
 }
-function sortTasks(tasks) {
+function sortTasks(tasks, curTime = getTime(), curDate = getDate()) {
     let save = !tasks; //don't save if is given job
     tasks = tasks || getTasks();
     let dayTasks = tasksInDays(tasks);
@@ -771,7 +784,7 @@ function sortTasks(tasks) {
             for (let index2 = 0; index2 < curTasks.length; index2++) {
                 if (index1 == index2 || //not move to same
                     Math.abs(index1 - index2) > taskDist) continue; //move not further than 3 tasks
-                if (trySortTasks(curTasks, index1, index2)) {//if changes, go back
+                if (trySortTasks(curTasks, index1, index2, curTime, curDate)) {//if changes, go back
                     index1 = index2 = Math.max(0, Math.min(index1, index2) - taskDist);
                     changes--;
                     if (changes < 0) {
@@ -794,13 +807,13 @@ function pageTooMuchWork() {
         "Drücke auf weiter, um die nächsten 1000 Änderungen vorzunehmen.");
     addButtons([{ name: "Weiter", onclick: start }]); //restart
 }
-function trySortTasks(tasks, index1, index2) {
-    const oldBuffers = getTimeBuffer(tasks, true);
+function trySortTasks(tasks, index1, index2, curTime, curDate) {
+    const oldBuffers = getTimeBuffer(tasks, true, curTime, curDate);
     const oldEvents = oldBuffers.events;
     const oldTasks = oldBuffers.tasks;
     if (index1 > index2) { //order doesnt matter
         exchangeElInArray(tasks, index1, index2);
-        const changeBuffers = getTimeBuffer(tasks, true);
+        const changeBuffers = getTimeBuffer(tasks, true, curTime, curDate);
         const changeEvents = changeBuffers.events;
         const changeTasks = changeBuffers.tasks;
         let change = hasHighestNumber(changeEvents, oldEvents);
@@ -809,7 +822,7 @@ function trySortTasks(tasks, index1, index2) {
         exchangeElInArray(tasks, index2, index1); //change back
     }
     moveElInArray(tasks, index1, index2);
-    const moveBuffers = getTimeBuffer(tasks, true);
+    const moveBuffers = getTimeBuffer(tasks, true, curTime, curDate);
     const moveEvents = moveBuffers.events;
     const moveTasks = moveBuffers.tasks;
     let move = hasHighestNumber(moveEvents, oldEvents);
@@ -1175,7 +1188,7 @@ function questRand() {
             break;
         }
     }
-    if (manager.quest) return; //has been setted
+    if (manager.quest) return; //has been set
     if (!linkType) return;
     manager.quest = {
         object: objectId,
@@ -1292,12 +1305,12 @@ function submitObjectQuest() {
     const object = indexById(quest.object, objects, true);
     if (!object) return alertInfo("Objeckt nicht gefunden.");
     const links = object.links[quest.linkType] || [];
-    const dataType = el("dataType").value;
+    const dataType = el("dataType").innerText;
     const value = readValueInput("data");
     const valueText = objectValueToText({
         value: value, //pretend being an object
         dataType: dataType
-    })
+    });
     let rightId; //search for connection
     for (let index = 0; index < links.length; index++) {
         const link = links[index];
@@ -1795,8 +1808,7 @@ function pageNewTask(id) {
             addSubHeader("Dauer",
                 "Diese Zahl beschreibt, " +
                 "wie viele Minuten du für die Aufgabe brauchst, um sie zu erledigen. " +
-                "Wenn eine Dauer für dich hier keinen Sinn macht, kannst du sie eventuell auch weglassen. " +
-                "Dann handelt es sich um ein Event (Ereignis), für das du die Startzeit definieren kannst.",
+                "Wenn eine Dauer für dich hier keinen Sinn macht, kannst du sie eventuell auch weglassen.",
                 timesBoxId);
             addNumberInput("duration", timesBoxId);
             addSubHeader("Startzeit",
