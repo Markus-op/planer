@@ -113,12 +113,14 @@ function checkForStartPause() {
     const pause = manager.pause || {};
     if (getTodayTasks().length == 0) return false; //no tasks to interrupt
     return getPauseTime() > 5 * 60 && //pause longer than 5min
+        getTimeBuffer() > 5 * 60 && //min 5 min time in plan
         getTime() > (pause.delayTime || 0); //not delayed
 }
 function checkForInPause() {
     const manager = getManager();
     const pause = manager.pause || {};
     if (!pause.startPauseTime) return null; //no pause
+    if (getTimeBuffer() < 0) return false; //pause has  to be finished now
     const duration = getPauseTime();
     let pauseTime = pause.startPauseTime + duration; //deadline
     return getTime() < pauseTime; //whether pause is left
@@ -165,7 +167,7 @@ function getPauseTime() {
     const factor = 1 - workTime / timeLeft || 0; //amount of freetime in whole time
     const lastWorkTime = startPause - pause.startWorkTime || 0;
     const duration = Math.round(lastWorkTime * factor) || 0;
-    return Math.max(0, Math.min(duration, getTimeBuffer(startPause), 20 * 60));
+    return Math.max(0, Math.min(duration, 20 * 60));
 }
 function todayDeadline() {
     const tasks = getTodayTasks();
@@ -449,7 +451,7 @@ function chooseTask(id) {
         });
     choose(taskId, "tasks", buttons);
 }
-function chooseSubTask(id, isAcitveEvent) {
+function chooseSubTask(id, isAcitveEvent, mainId) {
     const taskId = "task_" + id;
     let buttons = [
         {
@@ -469,6 +471,12 @@ function chooseSubTask(id, isAcitveEvent) {
             }
         }
     ];
+    if (mainId && mainId != id) { //is sub task
+        buttons[1] = {
+            name: "Trennen",
+            onclick: () => separateTask(id, mainId)
+        }
+    }
     if (isAcitveEvent) {
         buttons = [{ //first breake
             name: "Abbrechen", onclick: () => {
@@ -661,8 +669,7 @@ function findLinkedTasks(id, alsoThisTask, tasks) {
     }
     return taskList;
 }
-function resortTaskLinks(tasks, refillLinks) {
-    tasks = tasks || getTasks();
+function resortTaskLinks(tasks = getTasks(), refillLinks) {
     for (let index = 0; index < tasks.length; index++) {
         const task = tasks[index];
         let taskList = task.taskList || [];
@@ -1002,12 +1009,14 @@ function removeEvents() {
         }
     }
 }
-function separateTask(id) {
-    let tasks = getTasks();
-    const index = indexById(id);
-    let task = tasks[index];
+function separateTask(id, mainId) {
+    const tasks = getTasks()
+    let task = indexById(id, tasks, true);
     if (!task) return;
-    task.taskList = []; //cut from this task
+    if (mainId) { //sep only main task
+        const idIndex = task.taskList.indexOf(mainId);
+        if (idIndex >= 0) task.taskList.splice(idIndex);
+    } else task.taskList = []; //cut from this task
     resortTaskLinks(tasks, false); //cut from other tasks
     saveTasks(tasks, true);
     pageViewTask(id);
@@ -1119,7 +1128,7 @@ function objectValueToText(object) {
     if (dataType.includes("Datum")) {
         return dateToString(object.value);
     }
-    if (dataType == "Wahrheitswert") return object.value ? "Wahr" : "Falsch";
+    if (dataType == "Wahrheitswert") return object.value ? "Ja" : "Nein";
     if (object.value == null) return object.title; //view older version
     return String(object.value);
 }
@@ -1202,7 +1211,9 @@ function questRand() {
     let max = 500;
     while (max > 0) {
         max--;
-        objectId = randEl(getObjects()).id;
+        const randObj = randEl(getObjects());
+        if (!randObj.dataType || randObj.dataType == "Text") //only texts
+            objectId = randObj.id;
         const posTypes = typicalLinks(objectId);
         if (posTypes.length) {
             linkType = randEl(posTypes);
@@ -1282,6 +1293,7 @@ function removeObject(id) {
 function typicalLinks(objectId, objects) {
     objects = objects || getObjects();
     const object = indexById(objectId, objects, true);
+    if (!object) return [];
     let reversedLinks = object.reversedLinks;
     let ownTypes = []; //that describe this
     for (let index = 0; index < reversedLinks.length; index++) {
@@ -1534,23 +1546,23 @@ function addObjectReminder(objects = getObjects(), tasks = getTasks()) {
     for (let index = 0; index < objects.length; index++) {
         const object = objects[index];
         if (object.dataType != "Text") continue;
-        const links = Object.entries(object.links || {});
+        const links = Object.entries(object.links || {}); //types of links
         for (let index = 0; index < links.length; index++) {
-            const typedLinks = links[index][1];
-            for (let index = 0; index < typedLinks.length; index++) {
-                const linkId = typedLinks[index];
+            const typedLinks = links[index][1]; //inner links
+            for (let i = 0; i < typedLinks.length; i++) {
+                const linkId = typedLinks[i];
                 const linkObj = indexById(linkId, objects, true);
                 if (!linkObj) continue;
                 if (linkObj.dataType != "Reines Datum") continue;
                 const date = linkObj.value;
                 const curDate = getDate();
                 date.year = curDate.year;
-                if (isPastDate(curDate, date)) date.year++; //focus on next date
-                dif = dateDif(curDate, date); //from now to event in days
+                if (isPastDate(date, curDate)) date.year++; //focus on next date
+                const dif = dateDif(curDate, date); //from now to event in days
                 if (dif > 0 && dif % 7 == 0 && dif <= 14) {
                     const task = {
-                        id: generateId() + index,
-                        text: object.value,
+                        id: generateId() + i + "," + index,
+                        text: links[i][0] + " (" + object.value + ")",
                         date: getDate(),
                         time: Math.min(getTime() + 60 * 60, 22 * 60 * 60), //in 1h but latest 22:00
                         taskList: []
@@ -1647,7 +1659,8 @@ function pageInPause() {
         { name: "Pause beenden", onclick: stopPause }
     ]);
     const timeSet = setInterval(() => {
-        let time = Math.ceil((pause.startPauseTime + getPauseTime() - getTime()) / 60);
+        let time = Math.min(pause.startPauseTime + getPauseTime() - getTime(), getTimeBuffer());
+        time = Math.ceil(time / 60);
         if (time <= 0) start();
         time = time == 1 ? "Dir bleibt noch eine Minute" :
             "Dir bleiben noch " + time + " Minuten";
@@ -1954,21 +1967,20 @@ function pageLinkTasks(id) {
 function pageListTasks() {
     removeQuestWaiter(); //when coming from people mode
     const tasks = getImportantTasks();
-    if (tasks.length == 0) pageWelcome();
-    else {
-        setHeader("Übersicht");
-        addTaskList(tasks);
-        let buttons = [{ name: "Neue Aufgabe", onclick: pageNewTask }];
-        if (curEvents().length > 0)
-            buttons.push({ name: "Event ansehen", onclick: pageEvents });
-        if (checkForDoTask()) //task is to do
-            buttons.push({ name: "Zur Aufgabe", onclick: pageCheckTask });
-        else if (typeof checkForInPause() == "boolean")
-            buttons.push({ name: "Pause sehen", onclick: pageInPause });
-        else if (checkForStartPeopleMode())
-            buttons.push({ name: "Zu Leuten wechseln", onclick: startPeopleMode })
-        addButtons(buttons);
-    }
+    if (tasks.length == 0) return pageWelcome();
+    setHeader("Übersicht");
+    addTaskList(tasks);
+    let buttons = [{ name: "Neue Aufgabe", onclick: pageNewTask }];
+    if (checkForDoTask()) //task is to do
+        buttons.push({ name: "Zur Aufgabe", onclick: pageCheckTask });
+    else if (curEvents().length > 0)
+        buttons.push({ name: "Event ansehen", onclick: pageEvents });
+    else if (typeof checkForInPause() == "boolean")
+        buttons.push({ name: "Pause sehen", onclick: pageInPause });
+    else if (checkForStartPeopleMode())
+        buttons.push({ name: "Zu Leuten wechseln", onclick: startPeopleMode })
+    addButtons(buttons);
+    if (checkForPeopleMode()) addAutoReload();
 }
 function pageProblemTasks() {
     setHeader("Keine Zeit");
@@ -1985,16 +1997,7 @@ function pageDoTask(text) {
     setHeader("Los geht's");
     addSubHeader(text);
     addText("Erledige deine Aufgabe!");
-    let reloadCounter = getTime();
-    const reload = setInterval(() => {
-        if (getTime() - reloadCounter > 2) {
-            clearInterval(reload);
-            start();
-        }
-        else reloadCounter = getTime();
-        console.log(reloadCounter);
-
-    }, 1000)
+    addAutoReload();
 }
 function pageCheckTask() {
     const manager = getManager();
@@ -2027,6 +2030,7 @@ function pageCheckTask() {
         { name: "Übersicht", onclick: pageListTasks },
         { name: "Aufgabe beenden", onclick: checkTask }
     ]);
+    addAutoReload();
 }
 function pageViewTask(id) {
     const tasks = getTasks();
@@ -2181,6 +2185,18 @@ function pageObjectQuest() {
         { name: "Weiß nicht", onclick: () => pageViewObject(object.id) },
         { name: "Fertig", onclick: submitObjectQuest }
     ]);
+}
+function addAutoReload(handler = start) {
+    addEl("main", "div", "autoReload");
+    let reloadCounter = getTime();
+    const reload = setInterval(() => {
+        if (!el("autoReload")) clearInterval(reload); //changed site
+        if (getTime() - reloadCounter > 2) { //off a few sec
+            clearInterval(reload);
+            handler();
+        }
+        else reloadCounter = getTime();
+    }, 1000)
 }
 function addSuggestion(id, list = getTasks(), parentId = "main", onclick, args = []) {
     const sugBoxId = "suggestion_" + id + "_Box";
@@ -2556,9 +2572,9 @@ function taskTimeLine(task) {
 }
 function addSubTasks(id) {
     const tasks = sortTasksByEnd(findLinkedTasks(id, true));
-    addEditTasks(tasks, false);
+    addEditTasks(tasks, false, id);
 }
-function addEditTasks(tasks, isAcitveEvent) {
+function addEditTasks(tasks, isAcitveEvent, mainTask) {
     let parentId = "shinyTasks";
     if (el(parentId)) el(parentId).innerHTML = ``; //add list
     else addEl("main", "div", parentId);
@@ -2579,7 +2595,7 @@ function addEditTasks(tasks, isAcitveEvent) {
         addEl(taskContentId, "div", "textLine_" + task.id, ["left"], () => pageViewTask(task.id), [task.text]);
         addEl(taskContentId, "div", "timeLine_" + task.id, ["left"], () => pageEditTask(task.id), [taskTimeLine(task)]);
         addEl(taskOptionsId, "div", "optionButton_" + task.id, ["circle"], () => {
-            chooseSubTask(task.id, isAcitveEvent);
+            chooseSubTask(task.id, isAcitveEvent, mainTask);
         });
     }
 }

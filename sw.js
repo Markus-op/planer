@@ -1,4 +1,4 @@
-const CACHE_NAME = "planer-cache-2.0(0)";
+const CACHE_NAME = "planer-cache-2.0(7)";
 const FILES_TO_CACHE = [
     "/",          // Startseite
     "/index.html",
