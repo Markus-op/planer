@@ -245,6 +245,27 @@ function latestStartTime() { //returns buffer
     }
     return timeDif(getDate(), getTime(), setDate, setTime); //
 }
+function latestStartTime() { //returns buffer
+    let tasks = getTasks();
+    let stepTime = 10 * 60 * 60;
+    let setTime = getTime() + stepTime;
+    let setDate = getDate();
+    for (let amount = 10; amount > 0; amount--) {
+        if (setTime > 24 * 60 * 60) { //tomorrow
+            setTime -= 24 * 60 * 60;
+            setDate = nextDate(setDate);
+        } else if (setTime < 0) { //yesterday
+            setTime = 24 * 60 * 60 - setTime;
+            setDate = lastDate(setDate);
+        }
+        tasks = sortTasks(tasks, setTime, setDate); //without changes in orig
+        if (getTimeBuffer(tasks, false, setTime, setDate) < 0) { //planed too late
+            setTime -= stepTime;
+        } else setTime += stepTime;
+        stepTime /= 2; //half for next time
+    }
+    return timeDif(getDate(), getTime(), setDate, setTime); //
+}
 function getNightTimes(time = getTime(), asStrings = false) {
     const dayTime = 24 * 60 * 60;
     time += latestStartTime(); //get latest time to start tomorow
