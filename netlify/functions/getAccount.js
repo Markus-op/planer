@@ -4,7 +4,6 @@ export async function handler(event, context) {
     const tableName = 'mainTable';
     
     const accountId = JSON.parse(event.body || "{}");
-
     try {
         const response = await fetch(`https://api.airtable.com/v0/${baseId}/${tableName}`, {
             headers: {
@@ -23,6 +22,15 @@ export async function handler(event, context) {
         } else {
             return {
                 statusCode: 404,
+                body: "No Account",
+            };
+        }
+    } catch (error) {
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: error.message }),
+        };
+    }
                 body: "No Account",
             };
         }
