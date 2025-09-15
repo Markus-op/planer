@@ -253,7 +253,7 @@ function getNightTimes(time = getTime(), asStrings = false) {
     const sleepTime = asStrings ? miniStr(time) : time;
     time -= 60 * 60;
     const prepareTime = asStrings ? miniStr(time) : time;
-    time -= 60 * 60;
+    time -= 2 * 60 * 60;
     const remindTime = asStrings ? miniStr(time) : time;
     return {
         remindTime: remindTime,
@@ -1850,7 +1850,17 @@ function pageNewTask(id) {
                 "Gib hier den Zeitpunkt an, wann du frühestens loslegen möchtest. " +
                 "Du kannst die Startzeit auch wieder löschen, falls du jederzeit starten kannst.",
                 timesBoxId);
-            addClosableTimeInput("start", false, null, timesBoxId);
+            addClosableTimeInput("start", false, () => {
+                const date = valueToDate(el("start_date").value);
+                el("start_date").addEventListener("blur", () => {
+                    const newDate = valueToDate(el("start_date").value);
+                    const dayDif = dateDif(date, newDate); //calc dif
+                    let deadline = valueToDate(el("date").value);
+                    if (dayDif > 0) deadline = addDate(deadline, dayDif);
+                    else if (dayDif < 0) deadline = backDate(deadline, -dayDif);
+                    el("date").value = dateToValue(deadline); //set dif
+                }, { once: true });
+            }, timesBoxId);
             addSubHeader("Frist",
                 "Eine Frist muss immer gesetzt sein. Dann muss die Aufgabe fertig sein.",
                 timesBoxId);
