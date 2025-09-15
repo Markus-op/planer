@@ -2,6 +2,13 @@ document.addEventListener("DOMContentLoaded", preStart);
 function preStart() {
     colorPage();
     const manager = getManager();
+    if (manager.dataId) {
+        try {
+            getDBData(manager.dataId, () => saveManager(manager));
+        } catch {
+            alertInfo("Problem beim Laden des Accounts.");
+        }
+    }
     if (!manager.askAccount) pageAskAccount();
     else start();
 }
@@ -28,7 +35,7 @@ function submitLogInAccount() {
 }
 function start() {
     removeEvents();
-    sortTasks();
+    normalSortTasks();
     const isNewDay = dailyUpdate();
     if (isNewDay) {
         addObjectReminder(); //reminder daily from objects
@@ -48,7 +55,8 @@ function start() {
     else if (checkForProblemTasks()) pageProblemTasks();
     else if (checkForStartPause()) pageStartPause();
     else if (checkForShowPlan()) pageShowPlan();
-    else if (checkForShowSleepTime()) pageShowSleepTimes();
+    else if (checkForSleep()) pageSleeping()
+    else if (checkForPrepare()) pageShowSleepTimes();
     else if (checkForQuest()) pageObjectQuest();
     else if (checkForPeopleMode()) pageViewObject();
     else pageListTasks();
@@ -219,58 +227,23 @@ function checkForQuest() {
     const manager = getManager();
     return Boolean(manager.quest) && checkForPeopleMode();
 }
-function checkForShowSleepTime() {
+function checkForSleep() {
     if (getTodayTasks().length > 0) return false; //not finished yet
-    const remindTime = getNightTimes().remindTime;
-    if (getTime() < remindTime) return false; //too soon
-    if (getManager().showedSleepTimes) return false; //showed already
+    if (!getManager().showedSleepTimes) return false; //not informed
+    const sleepTime = getNightTimes().sleepTime;
+    if (getTime() < sleepTime) return false; //too soon
     return true;
 }
-function latestStartTime() { //returns buffer
-    let tasks = getTasks();
-    let stepTime = 10 * 60 * 60;
-    let setTime = getTime() + stepTime;
-    let setDate = getDate();
-    for (let amount = 10; amount > 0; amount--) {
-        if (setTime > 24 * 60 * 60) { //tomorrow
-            setTime -= 24 * 60 * 60;
-            setDate = nextDate(setDate);
-        } else if (setTime < 0) { //yesterday
-            setTime = 24 * 60 * 60 - setTime;
-            setDate = lastDate(setDate);
-        }
-        tasks = sortTasks(tasks, setTime, setDate); //without changes in orig
-        if (getTimeBuffer(tasks, false, setTime, setDate) < 0) { //planed too late
-            setTime -= stepTime;
-        } else setTime += stepTime;
-        stepTime /= 2; //half for next time
-    }
-    return timeDif(getDate(), getTime(), setDate, setTime); //
-}
-function latestStartTime() { //returns buffer
-    let tasks = getTasks();
-    let stepTime = 10 * 60 * 60;
-    let setTime = getTime() + stepTime;
-    let setDate = getDate();
-    for (let amount = 10; amount > 0; amount--) {
-        if (setTime > 24 * 60 * 60) { //tomorrow
-            setTime -= 24 * 60 * 60;
-            setDate = nextDate(setDate);
-        } else if (setTime < 0) { //yesterday
-            setTime = 24 * 60 * 60 - setTime;
-            setDate = lastDate(setDate);
-        }
-        tasks = sortTasks(tasks, setTime, setDate); //without changes in orig
-        if (getTimeBuffer(tasks, false, setTime, setDate) < 0) { //planed too late
-            setTime -= stepTime;
-        } else setTime += stepTime;
-        stepTime /= 2; //half for next time
-    }
-    return timeDif(getDate(), getTime(), setDate, setTime); //
+function checkForPrepare() {
+    if (getTodayTasks().length > 0) return false; //not finished yet
+    if (getManager().showedSleepTimes) return false; //showed already
+    const remindTime = getNightTimes().remindTime;
+    if (getTime() < remindTime) return false; //too soon
+    return true;
 }
 function getNightTimes(time = getTime(), asStrings = false) {
     const dayTime = 24 * 60 * 60;
-    time += latestStartTime(); //get latest time to start tomorow
+    time += getTimeBuffer();
     time = Math.min(time, dayTime * 34 / 24); //latest is 10:00
     time = Math.ceil(time / 60 / 60 * 4) * 60 * 60 / 4; //round to next 1/4 h
     const startTime = asStrings ? miniStr(time) : time; //(more than 24h is ok)
@@ -798,6 +771,27 @@ function sortTasksByEnd(tasks) {
         if (!changed) break; //nothing changed
     }
     return tasks;
+}
+function normalSortTasks() {
+    let tasks = getTasks();
+    const dayTime = 24 * 60 * 60;
+    let date = getDate();
+    let time = getTime();
+    if (getTodayTasks().length == 0) { //skip day
+        let buffer = getTimeBuffer();
+        let lastTasks;
+        do {
+            time += buffer; //go further in time
+            if (time > dayTime) { //next day
+                date = nextDate(date);
+                time -= dayTime;
+            }
+            tasks = sortTasks(tasks, time, date); //sort for better order
+            lastTasks = cl(tasks);
+            buffer = getTimeBuffer(tasks, false, time, date); //reset buffer
+        } while (buffer > 0); //stop when buffer low
+        saveTasks(lastTasks);
+    } else sortTasks();
 }
 function sortTasks(tasks, curTime = getTime(), curDate = getDate()) {
     let save = !tasks; //don't save if is given job
@@ -1586,7 +1580,7 @@ function pageAskAccount() {
                 "gespeichert werden.");
         }
         const time = getTime()
-        let intro = "Willkommen zurück";
+        let intro = "Guten Tag!";
         if (time < 12 * 60 * 60) intro = "Guten Morgen!";
         else if (time > 18 * 60 * 60) intro = "Guten Abend!";
         setHeader(intro);
@@ -1699,6 +1693,12 @@ function pageShowSleepTimes() {
     addSubHeader("Anfangen", "Nun kannst du mit deinen Aufgaben anfangen.");
     addText(nightTimes.startTime);
     addButtons([{ name: "Verstanden", onclick: start }]);
+}
+function pageSleeping() {
+    setHeader("Nicht müde?");
+    addText("Du solltest eigentlich schlafen... " +
+        "Dann kommst du morgen besser aus dem Bett.");
+    addButtons([{ name: "Ausnahme", onclick: pageListTasks }]);
 }
 function pageNewIntent() {
     setHeader("Neuer Vorsatz");
@@ -1838,7 +1838,8 @@ function pageNewTask(id) {
     addEl("main", "div", repeatBoxId);
     el("text").onblur = addTimes;
     function addTimes() {
-        if (!el("duration")) { //not already added
+        const titleEl = el("text") || {};
+        if (!el("duration") && titleEl.value) { //not already added and title set
             addSubHeader("Dauer",
                 "Diese Zahl beschreibt, " +
                 "wie viele Minuten du für die Aufgabe brauchst, um sie zu erledigen. " +
@@ -2212,6 +2213,7 @@ function addSuggestion(id, list = getTasks(), parentId = "main", onclick, args =
             const object = list[index];
             let title = typeof object == "string" ? object :
                 (object.text || object.value || object.title || ""); //title is old version
+            if (typeof title != "string") continue;
             const inRate = containRate(title, text) //contain more imp
                 + similiarRate(title, text); //sim also important
             if (inRate > matchRate) { //set new match
@@ -2965,6 +2967,8 @@ function getTime() {
 }
 function timeToValue(time) {
     if (typeof time != "number") return undefined;
+    time = (time) % (24 * 60 * 60); //at a day
+    if (time < 0) time = 24 * 60 * 60 - time;
     let secs = time % 60;
     time -= secs;
     let mins = (time / 60) % 60;
